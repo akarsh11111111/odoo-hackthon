@@ -24,7 +24,7 @@ TransitOps is a centralized, high-fidelity transport operations command center d
 
 ---
 
-## 🔒 Security & Access Validation (New)
+## 🔒 Security & Access Validation
 
 ### 1. One-Time Password (OTP) Verification
 - **Dual-Mode OTP Gate**: Before establishing user sessions, the platform presents a secure 6-digit OTP verification panel.
