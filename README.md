@@ -102,4 +102,4 @@ TransitOps is a centralized, high-fidelity transport operations command center d
    ```bash
    uvicorn src.main:app --reload
    ```
-   *The interactive API documentation will be available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).*
+   <!-- *The interactive API documentation will be available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).* -->
