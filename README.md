@@ -1,22 +1,105 @@
-# odoo-hackthon
+# TransitOps — Smart Transport Operations Platform
 
-This repository now contains both the TransitOps FastAPI backend and the Vite + React frontend branch under a single workspace.
+TransitOps is a centralized, high-fidelity transport operations command center designed for fleet managers, dispatchers, safety compliance officers, and financial analysts. It serves as a digital twin for commercial vehicle fleets, managing the complete lifecycle of logistics operations from vehicle registration and driver logs to active dispatches, maintenance windows, and fuel expenses.
 
-## Structure
+---
 
-- `backend/` - FastAPI enterprise backend
-- `frontend/` - React + TypeScript + Vite frontend app
+## 🛠️ Technology Stack
 
-## Backend verification
+### 🚀 Frontend
+- **Framework**: React 19, Vite, TypeScript
+- **Styling**: Tailwind CSS v4 (configured via CSS variables in `@tailwindcss/vite`)
+- **State Management**: Zustand (in-memory client state store supporting role-based access configurations and local transactions)
+- **Animations**: Framer Motion (used for page entry transitions, dashboard telemetry updates, and drawer animations)
+- **Data Visualization**: Recharts (for weekly dispatch volumes, expense categories, and monthly budget logs)
+- **UI Components**: Radix UI (Primitives for Avatars, Dialogs, Dropdowns, and Tabs), Lucide React (Industrial transport iconography), Sonner (Tactical action alerts)
 
-The backend is verified locally with the health endpoint responding successfully at `http://127.0.0.1:8000/api/v1/health`.
+### ⚙️ Backend
+- **Framework**: Python 3.12+, FastAPI
+- **Database**: MongoDB (via Motor async driver)
+- **Database Object-Document Mapper (ODM)**: Beanie ODM
+- **Validation**: Pydantic v2 (for models, schemas, and configurations)
+- **ASGI Server**: Uvicorn
+- **Authentication**: JWT Bearer Tokens, Bcrypt password hashing
 
-## Frontend verification
+---
 
-The frontend branch was validated with a production build:
+## 📁 Repository Structure
 
-- `npm install`
-- `npm run build`
+### 💻 Frontend Architecture (`/frontend`)
+- **`src/context/useStore.ts`**: The central application state container (Zustand). It defines standard mock data schemas representing:
+  - **Vehicles**: Max load limits, odometers, acquisition costs, and status parameters (`Available`, `On Trip`, `In Shop`, `Retired`).
+  - **Drivers**: License types (Class A/B), expiry dates, safety compliance metrics, and safe hours tracked.
+  - **Trips**: Live routes, priority thresholds, payloads, cargo types, and live ETA trackers.
+  - **Alerts**: Sensor malfunction alerts.
+  - **Role configurations**: Access control settings for `Admin`, `Dispatcher`, `Safety Officer`, and `Financial Analyst`.
+- **`src/components/`**:
+  - `Header.tsx`: Integrated digital ticker clock (CST), voice-recognition speech triggers, and notification feeds categorized chronologically.
+  - `Sidebar.tsx`: Multi-layered collapsible workspace shortcuts.
+  - `MapCanvas.tsx`: Vector-based logistics grid simulation rendering live data packets, animated coordinate arcs, and target HUD vehicle indicators.
+  - `SpotlightCard.tsx`: Multi-directional hover illumination effects.
+- **`src/pages/`**:
+  - `Auth.tsx`: Two-column role selection gateway with credential strength checking and security verification checklists.
+  - `Dashboard.tsx`: Interactive control panel featuring count-up telemetry metrics, weekly charts, route bottleneck advisories, and active task checklists.
+  - `Fleet.tsx`: Master asset registry grids with CSV/Excel exports and details slide drawers containing visual chassis diagnostics.
+  - `Drivers.tsx`: Drivers compliance hub showing CDL licenses, safe hours ratings, and safety recommendation logs.
+  - `Dispatcher.tsx`: Live dispatches dashboard including weather map overlays and waypoint timelines.
+  - `Maintenance.tsx`: Mechanical operations center managing active workshop bays and downtime analytics.
+  - `FuelExpense.tsx`: Fleet billing registries displaying category expenses (Fuel vs Repairs vs Tolls) and budget limits.
+  - `Analytics.tsx`: High-density reports filtering operational costs and vehicle return-on-investment (ROI) values.
+  - `Settings.tsx`: Security access panel adjusting RBAC privileges, audit trails, and API integrations (e.g. SAP Fiori, Stripe).
 
-The app builds successfully in the `frontend/` directory.
+### ⚙️ Backend Architecture (`/backend`)
+- **`src/main.py`**: ASGI web service constructor configuring CORS middlewares, exception handlers, and database lifecycle.
+- **`src/core/`**: Configuration loaders (Pydantic settings reading `.env`), logging formatters, database client connects, and exceptions.
+- **`src/models/`**: Beanie ODM database document schemas mapping collections:
+  - `Vehicle`, `Driver`, `Trip`, `Maintenance`, `Fuel`, `Expense`, `Audit`, `Auth`, `Notification`.
+- **`src/repositories/`**: Repository patterns abstraction database interactions (read/write/queries) for each collection.
+- **`src/api/`**: Endpoint routes:
+  - `/auth`: Access checks and user authorization.
+  - `/vehicle`, `/driver`, `/trip`: Asset CRUD registries and dispatch status switches.
+  - `/maintenance`, `/fuel`, `/expense`: Service bay updates and financial invoices logs.
+  - `/dashboard`, `/reports`: Multi-metric analytics aggregations.
+- **`src/middleware/`**: Request context bindings and authentication token validators.
 
+---
+
+## ⚡ Setup & Launch Instructions
+
+### 🛰️ Running the Frontend
+1. Navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+2. Install packages:
+   ```bash
+   npm install
+   ```
+3. Start local development server:
+   ```bash
+   npm run dev
+   ```
+4. Verify production compilation:
+   ```bash
+   npm run build
+   ```
+
+### 🗄️ Running the Backend
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+2. Create and configure your environment variables:
+   ```bash
+   cp .env.example .env
+   # Update MongoDB URI and JWT configurations in .env
+   ```
+3. Install package in editable mode with development dependencies:
+   ```bash
+   pip install -e .[dev]
+   ```
+4. Launch the local FastAPI service:
+   ```bash
+   uvicorn src.main:app --reload
+   ```
+   *The interactive API documentation will be available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).*
