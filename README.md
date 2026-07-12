@@ -1,6 +1,6 @@
 # TransitOps — Smart Transport Operations Platform
 
-TransitOps is a centralized, high-fidelity transport operations command center designed for fleet managers, dispatchers, safety compliance officers, and financial analysts. It serves as a digital twin for commercial vehicle fleets, managing the complete lifecycle of logistics operations from vehicle registration and driver logs to active dispatches, maintenance windows, and fuel expenses.
+TransitOps is a centralized, high-fidelity transport operations command center designed for fleet managers, drivers, safety compliance officers, and financial analysts. It serves as a digital twin for commercial vehicle fleets, managing the complete lifecycle of logistics operations from vehicle registration and driver logs to active dispatches, maintenance windows, and fuel expenses.
 
 ---
 
@@ -24,6 +24,23 @@ TransitOps is a centralized, high-fidelity transport operations command center d
 
 ---
 
+## 🔒 Security & Access Validation (New)
+
+### 1. One-Time Password (OTP) Verification
+- **Dual-Mode OTP Gate**: Before establishing user sessions, the platform presents a secure 6-digit OTP verification panel.
+- **Email Delivery Integration**: Dispatches a dynamic 6-digit verification pin directly to the user's real email address using the `FormSubmit` AJAX delivery network.
+- **Developer Test Override**: During offline test sessions or while using mock email accounts, developers can view the generated OTP directly in the browser's developer console (`F12`) for instant bypass.
+
+### 2. Authorized Email Whitelisting
+- **Domain Restriction**: Only corporate addresses ending with **`@transops.com`** are authorized to register user profiles. Registration attempts with non-corporate domains are rejected (returns HTTP 403 Forbidden).
+
+### 3. Lockdown Credentials Validation
+- Bypassing with random emails or passwords is blocked. Logins are strictly authenticated against:
+  - Pre-configured role profiles (`manager@transops.com`, `driver@transops.com`, etc.)
+  - Registered user accounts stored in the backend MongoDB server (or client-side localStorage fallback when running in offline mode).
+
+---
+
 ## 📁 Repository Structure
 
 ### 💻 Frontend Architecture (`/frontend`)
@@ -32,14 +49,18 @@ TransitOps is a centralized, high-fidelity transport operations command center d
   - **Drivers**: License types (Class A/B), expiry dates, safety compliance metrics, and safe hours tracked.
   - **Trips**: Live routes, priority thresholds, payloads, cargo types, and live ETA trackers.
   - **Alerts**: Sensor malfunction alerts.
-  - **Role configurations**: Access control settings for `Admin`, `Dispatcher`, `Safety Officer`, and `Financial Analyst`.
+  - **Role configurations**: Access control settings matching PDF spec target users:
+    - **`Fleet Manager`** (formerly Admin; full write control of assets)
+    - **`Driver`** (formerly Dispatcher; handles trip planning and dispatch runs)
+    - **`Safety Officer`** (tracks license compliance and service intervals)
+    - **`Financial Analyst`** (reviews fuel logs and budgets)
 - **`src/components/`**:
   - `Header.tsx`: Integrated digital ticker clock (CST), voice-recognition speech triggers, and notification feeds categorized chronologically.
   - `Sidebar.tsx`: Multi-layered collapsible workspace shortcuts.
   - `MapCanvas.tsx`: Vector-based logistics grid simulation rendering live data packets, animated coordinate arcs, and target HUD vehicle indicators.
   - `SpotlightCard.tsx`: Multi-directional hover illumination effects.
 - **`src/pages/`**:
-  - `Auth.tsx`: Two-column role selection gateway with credential strength checking and security verification checklists.
+  - `Auth.tsx`: Two-column role selection gateway, register operator switcher, password integrity checker, and the secure OTP modal dialog overlay.
   - `Dashboard.tsx`: Interactive control panel featuring count-up telemetry metrics, weekly charts, route bottleneck advisories, and active task checklists.
   - `Fleet.tsx`: Master asset registry grids with CSV/Excel exports and details slide drawers containing visual chassis diagnostics.
   - `Drivers.tsx`: Drivers compliance hub showing CDL licenses, safe hours ratings, and safety recommendation logs.
@@ -102,4 +123,3 @@ TransitOps is a centralized, high-fidelity transport operations command center d
    ```bash
    uvicorn src.main:app --reload
    ```
-   <!-- *The interactive API documentation will be available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).* -->

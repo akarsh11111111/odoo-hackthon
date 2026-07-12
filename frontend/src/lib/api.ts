@@ -1,4 +1,5 @@
-import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError } from 'axios';
+import type { InternalAxiosRequestConfig } from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/api/v1';
 const ACCESS_TOKEN_KEY = 'transops.access_token';
@@ -200,6 +201,14 @@ client.interceptors.response.use(
 const unwrap = <T>(response: { data: ApiEnvelope<T> }) => response.data.data as T;
 
 export const api = {
+  register: async (payload: { first_name: string; last_name: string; email: string; phone?: string | null; password: string; role_name: string }) => {
+    const response = await client.post<ApiEnvelope<AuthSession>>('/auth/register', payload);
+    if (response.data.data) {
+      persistAuthSession(response.data.data);
+    }
+    return response;
+  },
+
   login: async (payload: { email: string; password: string; device?: string; ip_address?: string | null }) => {
     const response = await client.post<ApiEnvelope<AuthSession>>('/auth/login', payload);
     if (response.data.data) {

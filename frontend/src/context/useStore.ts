@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { api } from '../lib/api';
 
 // Types definition
 export interface Vehicle {
@@ -81,34 +82,41 @@ interface AppState {
   setCurrentUser: (user: { email: string; role: string } | null) => void;
   updateRolePermissions: (roleName: string, category: keyof RolePermissions, type: 'read' | 'write', value: boolean) => void;
 
+  // Real Database Sync Actions
+  fetchVehicles: () => Promise<void>;
+  fetchDrivers: () => Promise<void>;
+  fetchTrips: () => Promise<void>;
+  fetchMaintenanceLogs: () => Promise<void>;
+  fetchExpenses: () => Promise<void>;
+
   // Fleet
   vehicles: Vehicle[];
-  addVehicle: (vehicle: Omit<Vehicle, 'id'>) => void;
-  updateVehicle: (id: string, updates: Partial<Vehicle>) => void;
-  deleteVehicle: (id: string) => void;
+  addVehicle: (vehicle: Omit<Vehicle, 'id'>) => Promise<void>;
+  updateVehicle: (id: string, updates: Partial<Vehicle>) => Promise<void>;
+  deleteVehicle: (id: string) => Promise<void>;
 
   // Drivers
   drivers: Driver[];
-  addDriver: (driver: Omit<Driver, 'id'>) => void;
-  updateDriver: (id: string, updates: Partial<Driver>) => void;
-  deleteDriver: (id: string) => void;
+  addDriver: (driver: Omit<Driver, 'id'>) => Promise<void>;
+  updateDriver: (id: string, updates: Partial<Driver>) => Promise<void>;
+  deleteDriver: (id: string) => Promise<void>;
 
   // Trips
   trips: Trip[];
-  addTrip: (trip: Omit<Trip, 'id' | 'progress'>) => void;
-  updateTrip: (id: string, updates: Partial<Trip>) => void;
-  completeTrip: (id: string) => void;
+  addTrip: (trip: Omit<Trip, 'id' | 'progress'>) => Promise<void>;
+  updateTrip: (id: string, updates: Partial<Trip>) => Promise<void>;
+  completeTrip: (id: string) => Promise<void>;
 
   // Maintenance
   maintenanceLogs: MaintenanceLog[];
-  addMaintenanceLog: (log: Omit<MaintenanceLog, 'id'>) => void;
-  updateMaintenanceLog: (id: string, updates: Partial<MaintenanceLog>) => void;
+  addMaintenanceLog: (log: Omit<MaintenanceLog, 'id'>) => Promise<void>;
+  updateMaintenanceLog: (id: string, updates: Partial<MaintenanceLog>) => Promise<void>;
 
   // Expenses
   expenses: FuelExpense[];
-  addExpense: (expense: Omit<FuelExpense, 'id'>) => void;
+  addExpense: (expense: Omit<FuelExpense, 'id'>) => Promise<void>;
 
-  // Global Alerts (from Screen 1 & Screen 3 dashboard rules)
+  // Alerts
   alerts: {
     id: string;
     vehicleId: string;
@@ -120,6 +128,7 @@ interface AppState {
   resolveAlert: (id: string) => void;
 }
 
+// Fallback Mock Data definition
 const initialVehicles: Vehicle[] = [
   { id: 'VEH-0987', type: 'Flatbed', plate: 'TX-7890', model: 'Peterbilt 579', status: 'Active', lastMaintenance: '2023-12-04', nextMaintenance: '2024-06-04', mileage: 120400 },
   { id: 'VEH-1243', type: 'Dry Van', plate: 'CA-4321', model: 'Freightliner Cascadia', status: 'Maintenance', lastMaintenance: '2024-01-10', nextMaintenance: '2024-04-10', mileage: 94800 },
@@ -162,8 +171,8 @@ const initialAlerts = [
 ];
 
 const defaultRoles: Record<string, RoleConfig> = {
-  Admin: {
-    name: 'Admin',
+  'Fleet Manager': {
+    name: 'Fleet Manager',
     description: 'Full administrative access to logistics command configuration, RBAC settings, registries and dispatching.',
     permissions: {
       fleet: { read: true, write: true },
@@ -174,8 +183,8 @@ const defaultRoles: Record<string, RoleConfig> = {
       settings: { read: true, write: true }
     }
   },
-  Dispatcher: {
-    name: 'Dispatcher',
+  Driver: {
+    name: 'Driver',
     description: 'Manage active runs, assign vehicles/drivers, log routes and watch live telemetry.',
     permissions: {
       fleet: { read: true, write: false },
@@ -212,8 +221,67 @@ const defaultRoles: Record<string, RoleConfig> = {
   }
 };
 
-export const useStore = create<AppState>((set) => ({
-  currentUser: null, // Start with null for Auth role selection
+// Data mapper helpers
+const mapBackendVehicleToFrontend = (v: any): Vehicle => ({
+  id: v.id || v._id,
+  type: v.vehicle_type,
+  plate: v.registration_number,
+  model: v.vehicle_name + ' ' + v.vehicle_model,
+  status: v.status === 'Available' ? 'Active' : v.status === 'In Shop' ? 'Maintenance' : 'Inactive',
+  lastMaintenance: v.created_at?.slice(0, 10) || '',
+  nextMaintenance: '',
+  mileage: v.current_odometer
+});
+
+const mapBackendDriverToFrontend = (d: any): Driver => ({
+  id: d.id || d._id,
+  name: `${d.first_name} ${d.last_name}`,
+  licenseNo: d.license_number,
+  licenseType: 'CDL-A',
+  expiryDate: d.license_expiry?.slice(0, 10) || '',
+  status: d.driver_status === 'Available' ? 'Active' : d.driver_status === 'Off Duty' ? 'On Leave' : 'Suspended',
+  safetyScore: d.safety_score,
+  safeHours: 1500
+});
+
+const mapBackendTripToFrontend = (t: any): Trip => ({
+  id: t.trip_number || t.id || t._id,
+  vehicleId: String(t.vehicle_id),
+  driverId: String(t.driver_id),
+  cargoType: t.cargo_description,
+  weight: t.cargo_weight,
+  routeFrom: t.source,
+  routeTo: t.destination,
+  dispatchTime: t.dispatch_time ? t.dispatch_time.slice(11, 16) : '08:00',
+  eta: t.expected_arrival ? t.expected_arrival.slice(11, 16) : '12:00',
+  priority: t.priority === 'High' || t.priority === 'Urgent' ? 'High' : t.priority === 'Normal' ? 'Medium' : 'Low',
+  status: t.status === 'Dispatched' ? 'In-Transit' : t.status === 'Completed' ? 'Completed' : t.status === 'Cancelled' ? 'Delayed' : 'Scheduled',
+  progress: t.status === 'Completed' ? 100 : t.status === 'Dispatched' ? 50 : 0
+});
+
+const mapBackendMaintenanceToFrontend = (m: any): MaintenanceLog => ({
+  id: m.maintenance_id || m.id || m._id,
+  vehicleId: String(m.vehicle_id),
+  serviceType: m.title || m.maintenance_type,
+  provider: m.vendor_name,
+  date: m.scheduled_date ? String(m.scheduled_date) : m.created_at?.slice(0, 10) || '',
+  cost: m.actual_cost ?? m.estimated_cost ?? 0,
+  status: m.status === 'Completed' ? 'Completed' : m.status === 'In Progress' ? 'In Progress' : 'Scheduled'
+});
+
+const mapBackendExpenseToFrontend = (e: any): FuelExpense => ({
+  id: e.expense_id || e.id || e._id,
+  date: e.expense_date ? String(e.expense_date) : e.created_at?.slice(0, 10) || '',
+  vehicleId: String(e.vehicle_id),
+  liters: 0,
+  cost: e.amount,
+  odometer: 0,
+  location: e.vendor,
+  type: e.expense_type === 'Fuel' ? 'Fuel' : e.expense_type === 'Repair' ? 'Repair' : e.expense_type === 'Toll' ? 'Toll' : 'Other'
+});
+
+export const useStore = create<AppState>((set, get) => ({
+  currentUser: null,
   rolesConfig: defaultRoles,
   
   setCurrentUser: (user) => set({ currentUser: user }),
@@ -239,56 +307,279 @@ export const useStore = create<AppState>((set) => ({
     };
   }),
 
+  // Database Sync routines with dual fallback
+  fetchVehicles: async () => {
+    try {
+      const res = await api.getVehicles();
+      if (res && Array.isArray(res.items)) {
+        set({ vehicles: res.items.map(mapBackendVehicleToFrontend) });
+      }
+    } catch (e) {
+      console.warn("Backend connection unavailable; using offline vehicles cache.", e);
+    }
+  },
+
+  fetchDrivers: async () => {
+    try {
+      const res = await api.getDrivers();
+      if (res && Array.isArray(res.items)) {
+        set({ drivers: res.items.map(mapBackendDriverToFrontend) });
+      }
+    } catch (e) {
+      console.warn("Backend connection unavailable; using offline drivers cache.", e);
+    }
+  },
+
+  fetchTrips: async () => {
+    try {
+      const res = await api.getTrips();
+      if (res && Array.isArray(res.items)) {
+        set({ trips: res.items.map(mapBackendTripToFrontend) });
+      }
+    } catch (e) {
+      console.warn("Backend connection unavailable; using offline dispatches cache.", e);
+    }
+  },
+
+  fetchMaintenanceLogs: async () => {
+    try {
+      const res = await api.getMaintenance();
+      if (res && Array.isArray(res.items)) {
+        set({ maintenanceLogs: res.items.map(mapBackendMaintenanceToFrontend) });
+      }
+    } catch (e) {
+      console.warn("Backend connection unavailable; using offline maintenance cache.", e);
+    }
+  },
+
+  fetchExpenses: async () => {
+    try {
+      const res = await api.getExpenses();
+      if (res && Array.isArray(res.items)) {
+        set({ expenses: res.items.map(mapBackendExpenseToFrontend) });
+      }
+    } catch (e) {
+      console.warn("Backend connection unavailable; using offline expenses cache.", e);
+    }
+  },
+
   // Vehicles
   vehicles: initialVehicles,
-  addVehicle: (v) => set((state) => ({
-    vehicles: [...state.vehicles, { ...v, id: `VEH-${Math.floor(1000 + Math.random() * 9000)}` }]
-  })),
-  updateVehicle: (id, updates) => set((state) => ({
-    vehicles: state.vehicles.map((v) => (v.id === id ? { ...v, ...updates } : v))
-  })),
-  deleteVehicle: (id) => set((state) => ({
-    vehicles: state.vehicles.filter((v) => v.id !== id)
-  })),
+  addVehicle: async (v) => {
+    try {
+      const payload = {
+        registration_number: v.plate,
+        vehicle_name: v.model.split(' ')[0] || 'Truck',
+        vehicle_model: v.model.split(' ').slice(1).join(' ') || 'Standard',
+        vehicle_type: v.type === 'Box Truck' ? 'Truck' : v.type === 'Van' ? 'Van' : 'Other',
+        maximum_load_capacity: 18000,
+        current_odometer: v.mileage,
+        acquisition_cost: 85000,
+        purchase_date: new Date().toISOString().split('T')[0],
+        status: v.status === 'Active' ? 'Available' : v.status === 'Maintenance' ? 'In Shop' : 'Retired',
+        region: 'Texas'
+      };
+      await api.createVehicle(payload);
+      await get().fetchVehicles();
+    } catch (e) {
+      console.warn("API write failed, mutating local store.", e);
+      set((state) => ({
+        vehicles: [...state.vehicles, { ...v, id: `VEH-${Math.floor(1000 + Math.random() * 9000)}` }]
+      }));
+    }
+  },
+
+  updateVehicle: async (id, updates) => {
+    try {
+      const payload: Record<string, any> = {};
+      if (updates.plate) payload.registration_number = updates.plate;
+      if (updates.mileage) payload.current_odometer = updates.mileage;
+      if (updates.status) {
+        payload.status = updates.status === 'Active' ? 'Available' : updates.status === 'Maintenance' ? 'In Shop' : 'Retired';
+      }
+      await api.updateVehicle(id, payload);
+      await get().fetchVehicles();
+    } catch (e) {
+      console.warn("API update failed, mutating local store.", e);
+      set((state) => ({
+        vehicles: state.vehicles.map((v) => (v.id === id ? { ...v, ...updates } : v))
+      }));
+    }
+  },
+
+  deleteVehicle: async (id) => {
+    try {
+      await api.deleteVehicle(id);
+      await get().fetchVehicles();
+    } catch (e) {
+      console.warn("API delete failed, mutating local store.", e);
+      set((state) => ({
+        vehicles: state.vehicles.filter((v) => v.id !== id)
+      }));
+    }
+  },
 
   // Drivers
   drivers: initialDrivers,
-  addDriver: (d) => set((state) => ({
-    drivers: [...state.drivers, { ...d, id: `DRV-${Math.floor(100 + Math.random() * 900)}` }]
-  })),
-  updateDriver: (id, updates) => set((state) => ({
-    drivers: state.drivers.map((d) => (d.id === id ? { ...d, ...updates } : d))
-  })),
-  deleteDriver: (id) => set((state) => ({
-    drivers: state.drivers.filter((d) => d.id !== id)
-  })),
+  addDriver: async (d) => {
+    try {
+      const payload = {
+        license_number: d.licenseNo,
+        first_name: d.name.split(' ')[0] || 'Operator',
+        last_name: d.name.split(' ').slice(1).join(' ') || 'Core',
+        license_expiry: d.expiryDate,
+        safety_score: d.safetyScore,
+        driver_status: d.status === 'Active' ? 'Available' : d.status === 'On Leave' ? 'Off Duty' : 'Suspended',
+        region: 'Texas'
+      };
+      await api.createDriver(payload);
+      await get().fetchDrivers();
+    } catch (e) {
+      console.warn("API write failed, mutating local store.", e);
+      set((state) => ({
+        drivers: [...state.drivers, { ...d, id: `DRV-${Math.floor(100 + Math.random() * 900)}` }]
+      }));
+    }
+  },
+
+  updateDriver: async (id, updates) => {
+    try {
+      const payload: Record<string, any> = {};
+      if (updates.name) {
+        payload.first_name = updates.name.split(' ')[0] || '';
+        payload.last_name = updates.name.split(' ').slice(1).join(' ') || '';
+      }
+      if (updates.expiryDate) payload.license_expiry = updates.expiryDate;
+      if (updates.status) {
+        payload.driver_status = updates.status === 'Active' ? 'Available' : updates.status === 'On Leave' ? 'Off Duty' : 'Suspended';
+      }
+      await api.updateDriver(id, payload);
+      await get().fetchDrivers();
+    } catch (e) {
+      console.warn("API update failed, mutating local store.", e);
+      set((state) => ({
+        drivers: state.drivers.map((d) => (d.id === id ? { ...d, ...updates } : d))
+      }));
+    }
+  },
+
+  deleteDriver: async (id) => {
+    try {
+      await api.deleteDriver(id);
+      await get().fetchDrivers();
+    } catch (e) {
+      console.warn("API delete failed, mutating local store.", e);
+      set((state) => ({
+        drivers: state.drivers.filter((d) => d.id !== id)
+      }));
+    }
+  },
 
   // Trips
   trips: initialTrips,
-  addTrip: (t) => set((state) => ({
-    trips: [...state.trips, { ...t, id: `TRP-${Math.floor(100 + Math.random() * 900)}`, progress: 0 }]
-  })),
-  updateTrip: (id, updates) => set((state) => ({
-    trips: state.trips.map((t) => (t.id === id ? { ...t, ...updates } : t))
-  })),
-  completeTrip: (id) => set((state) => ({
-    trips: state.trips.map((t) => (t.id === id ? { ...t, status: 'Completed', progress: 100 } : t))
-  })),
+  addTrip: async (t) => {
+    try {
+      const payload = {
+        trip_number: `TRP-${Math.floor(100 + Math.random() * 900)}`,
+        vehicle_id: t.vehicleId,
+        driver_id: t.driverId,
+        source: t.routeFrom,
+        destination: t.routeTo,
+        cargo_description: t.cargoType,
+        cargo_weight: t.weight,
+        estimated_distance: 350.0,
+        estimated_duration: 300,
+        priority: t.priority === 'High' ? 'High' : 'Normal',
+        status: 'Dispatched'
+      };
+      await api.createTrip(payload);
+      await get().fetchTrips();
+    } catch (e) {
+      console.warn("API write failed, mutating local store.", e);
+      set((state) => ({
+        trips: [...state.trips, { ...t, id: `TRP-${Math.floor(100 + Math.random() * 900)}`, progress: 0 }]
+      }));
+    }
+  },
+
+  updateTrip: async (id, updates) => {
+    try {
+      // Backend does not have single partial update, fallback or reload
+      await get().fetchTrips();
+    } catch (e) {
+      set((state) => ({
+        trips: state.trips.map((t) => (t.id === id ? { ...t, ...updates } : t))
+      }));
+    }
+  },
+
+  completeTrip: async (id) => {
+    try {
+      await api.completeTrip(id, { actual_distance: 350.0, fuel_consumed: 45.0, final_odometer: 120000 });
+      await get().fetchTrips();
+    } catch (e) {
+      console.warn("API complete failed, mutating local store.", e);
+      set((state) => ({
+        trips: state.trips.map((t) => (t.id === id ? { ...t, status: 'Completed', progress: 100 } : t))
+      }));
+    }
+  },
 
   // Maintenance
   maintenanceLogs: initialMaintenance,
-  addMaintenanceLog: (m) => set((state) => ({
-    maintenanceLogs: [...state.maintenanceLogs, { ...m, id: `MTN-${Math.floor(100 + Math.random() * 900)}` }]
-  })),
-  updateMaintenanceLog: (id, updates) => set((state) => ({
-    maintenanceLogs: state.maintenanceLogs.map((m) => (m.id === id ? { ...m, ...updates } : m))
-  })),
+  addMaintenanceLog: async (m) => {
+    try {
+      const payload = {
+        maintenance_id: `MTN-${Math.floor(100 + Math.random() * 900)}`,
+        vehicle_id: m.vehicleId,
+        maintenance_type: 'Service',
+        title: m.serviceType,
+        description: 'Scheduled maintenance checkup',
+        priority: 'Normal',
+        vendor_name: m.provider,
+        estimated_cost: m.cost,
+        scheduled_date: m.date,
+        status: 'Pending'
+      };
+      await api.createMaintenance(payload);
+      await get().fetchMaintenanceLogs();
+    } catch (e) {
+      console.warn("API write failed, mutating local store.", e);
+      set((state) => ({
+        maintenanceLogs: [...state.maintenanceLogs, { ...m, id: `MTN-${Math.floor(100 + Math.random() * 900)}` }]
+      }));
+    }
+  },
+
+  updateMaintenanceLog: async (id, updates) => {
+    set((state) => ({
+      maintenanceLogs: state.maintenanceLogs.map((m) => (m.id === id ? { ...m, ...updates } : m))
+    }));
+  },
 
   // Expenses
   expenses: initialExpenses,
-  addExpense: (e) => set((state) => ({
-    expenses: [...state.expenses, { ...e, id: `EXP-${Math.floor(100 + Math.random() * 900)}` }]
-  })),
+  addExpense: async (e) => {
+    try {
+      const payload = {
+        expense_id: `EXP-${Math.floor(100 + Math.random() * 900)}`,
+        vehicle_id: e.vehicleId,
+        expense_type: e.type === 'Fuel' ? 'Fuel' : e.type === 'Repair' ? 'Repair' : e.type === 'Toll' ? 'Toll' : 'Miscellaneous',
+        amount: e.cost,
+        vendor: e.location,
+        invoice_number: `INV-${Date.now()}`,
+        expense_date: e.date,
+        description: `Odometer reading logged: ${e.odometer}`
+      };
+      await api.createExpense(payload);
+      await get().fetchExpenses();
+    } catch (err) {
+      console.warn("API write failed, mutating local store.", err);
+      set((state) => ({
+        expenses: [...state.expenses, { ...e, id: `EXP-${Math.floor(100 + Math.random() * 900)}` }]
+      }));
+    }
+  },
 
   // Alerts
   alerts: initialAlerts,

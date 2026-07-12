@@ -27,7 +27,23 @@ interface ChatMessage {
 
 function App() {
   const currentUser = useStore((state) => state.currentUser);
+  const fetchVehicles = useStore((state) => state.fetchVehicles);
+  const fetchDrivers = useStore((state) => state.fetchDrivers);
+  const fetchTrips = useStore((state) => state.fetchTrips);
+  const fetchMaintenanceLogs = useStore((state) => state.fetchMaintenanceLogs);
+  const fetchExpenses = useStore((state) => state.fetchExpenses);
+
   const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchVehicles();
+      fetchDrivers();
+      fetchTrips();
+      fetchMaintenanceLogs();
+      fetchExpenses();
+    }
+  }, [currentUser, fetchVehicles, fetchDrivers, fetchTrips, fetchMaintenanceLogs, fetchExpenses]);
   
   // AI Copilot states
   const [aiOpen, setAiOpen] = useState(false);

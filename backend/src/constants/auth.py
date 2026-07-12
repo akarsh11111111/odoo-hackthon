@@ -3,7 +3,7 @@
 from typing import Final
 
 FLEET_MANAGER: Final[str] = "Fleet Manager"
-DISPATCHER: Final[str] = "Dispatcher"
+DISPATCHER: Final[str] = "Driver"
 SAFETY_OFFICER: Final[str] = "Safety Officer"
 FINANCIAL_ANALYST: Final[str] = "Financial Analyst"
 

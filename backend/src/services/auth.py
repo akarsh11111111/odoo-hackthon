@@ -40,6 +40,10 @@ class AuthService:
     refresh_token_repository: RefreshTokenRepository
 
     async def register(self, payload: RegisterRequest) -> AuthSessionResponse:
+        # Enforce authorized email domains
+        if not payload.email.lower().endswith("@transops.com"):
+            raise ForbiddenException("Email domain not authorized. Must be a valid @transops.com address.")
+
         existing_user = await self.user_repository.get_by_email(payload.email)
         if existing_user is not None:
             raise ConflictException("Email already exists")
