@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #08090C;
+  --color-sidebar: #0C0E12;
+  --color-card-bg: #11141B;
+  --color-border-accent: rgba(255, 255, 255, 0.04);
+  --color-primary-accent: #D88A1D;
+  --color-secondary-accent: #00F5FF;
+  --color-success-accent: #39FF14;
+  --color-danger-accent: #FF3131;
+  --color-warning-accent: #F59E0B;
+  
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "Fira Code", monospace;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: #e2e8f0;
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+    /* Cyber grid overlay */
+    background-image: 
+      radial-gradient(circle at 50% 50%, rgba(0, 245, 255, 0.015) 0px, transparent 60%),
+      linear-gradient(rgba(255, 255, 255, 0.002) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.002) 1px, transparent 1px);
+    background-size: 100% 100%, 24px 24px, 24px 24px;
+    background-attachment: fixed;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #08090C;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 245, 255, 0.1);
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 245, 255, 0.25);
+  }
+}
+
+@layer utilities {
+  .tactical-panel {
+    background: rgba(17, 20, 27, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    box-shadow: 
+      0 10px 40px -10px rgba(0, 0, 0, 0.7),
+      inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  }
+
+  .glow-cyan {
+    box-shadow: 0 0 15px rgba(0, 245, 255, 0.15);
+  }
+  
+  .glow-gold {
+    box-shadow: 0 0 15px rgba(216, 138, 29, 0.15);
+  }
+
+  .radar-sweep {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .radar-sweep::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: conic-gradient(from 0deg, rgba(0, 245, 255, 0.06) 0deg, transparent 90deg, transparent 360deg);
+    animation: rotate-radar 6s infinite linear;
+    pointer-events: none;
+  }
+
+  .scanline {
+    position: relative;
+  }
+
+  .scanline::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+    background-size: 100% 4px, 6px 100%;
+    pointer-events: none;
+    opacity: 0.45;
+  }
+}
+
+/* Sci-fi Animations */
+@keyframes rotate-radar {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes laser-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.85; }
+}
+
+.animate-laser-pulse {
+  animation: laser-pulse 2s infinite ease-in-out;
+}
