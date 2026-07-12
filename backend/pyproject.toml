@@ -9,7 +9,7 @@ description = "TransitOps - Smart Transport Operations Platform backend"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "beanie>=1.29.0",
+    "beanie>=1.29.0,<2.0.0",
     "email-validator>=2.2.0",
     "fastapi>=0.115.0",
     "motor>=3.6.0",
