@@ -66,7 +66,6 @@ class FakeFuelLog:
     id: str
     fuel_log_id: str
     vehicle_id: str
-    trip_id: str | None = None
     driver_id: str
     fuel_station: str
     fuel_type: str
@@ -75,9 +74,12 @@ class FakeFuelLog:
     total_cost: float
     current_odometer: int
     fuel_date: date
+    trip_id: str | None = None
     receipt_image: str | None = None
     notes: str | None = None
     created_by: str | None = None
+    updated_by: str | None = None
+    is_active: bool = True
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -87,15 +89,17 @@ class FakeExpense:
     id: str
     expense_id: str
     vehicle_id: str
-    trip_id: str | None = None
     expense_type: str
     amount: float
     vendor: str
     invoice_number: str
     expense_date: date
     description: str
+    trip_id: str | None = None
     attachment: str | None = None
     created_by: str | None = None
+    updated_by: str | None = None
+    is_active: bool = True
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -161,9 +165,14 @@ class FakeFuelLogRepository:
     async def get_by_id(self, fuel_log_id: str) -> FakeFuelLog | None:
         return self.logs.get(fuel_log_id)
 
+    async def get_by_fuel_log_id(self, fuel_log_id: str) -> FakeFuelLog | None:
+        return next((item for item in self.logs.values() if item.fuel_log_id == fuel_log_id), None)
+
     async def create(self, **fuel_log_data: object) -> FakeFuelLog:
-        fuel_log_id = f"fuel-{len(self.logs) + 1}"
-        fuel_log = FakeFuelLog(id=fuel_log_id, fuel_log_id=fuel_log_id, **fuel_log_data)
+        fuel_log_id = str(fuel_log_data.get("fuel_log_id", f"fuel-{len(self.logs) + 1}"))
+        fake_data = dict(fuel_log_data)
+        fake_data.pop("fuel_log_id", None)
+        fuel_log = FakeFuelLog(id=fuel_log_id, fuel_log_id=fuel_log_id, **fake_data)
         self.logs[fuel_log_id] = fuel_log
         return fuel_log
 
@@ -174,9 +183,17 @@ class FakeFuelLogRepository:
         fuel_log.updated_at = datetime.now(timezone.utc)
         return fuel_log
 
+    async def delete(self, fuel_log_id: str) -> FakeFuelLog:
+        fuel_log = self.logs[fuel_log_id]
+        fuel_log.is_active = False
+        return fuel_log
+
     async def list(self, *, skip: int = 0, limit: int = 20, filters: dict[str, object] | None = None, sort_by: str = "created_at", sort_order: str = "desc", search: str | None = None) -> tuple[list[FakeFuelLog], int]:
         items = list(self.logs.values())
         return items[skip : skip + limit], len(items)
+
+    async def list_history(self) -> list[FakeFuelLog]:
+        return list(self.logs.values())
 
     async def list_by_vehicle(self, vehicle_id: str) -> list[FakeFuelLog]:
         return [item for item in self.logs.values() if item.vehicle_id == vehicle_id]
@@ -189,9 +206,14 @@ class FakeExpenseRepository:
     async def get_by_id(self, expense_id: str) -> FakeExpense | None:
         return self.expenses.get(expense_id)
 
+    async def get_by_expense_id(self, expense_id: str) -> FakeExpense | None:
+        return next((item for item in self.expenses.values() if item.expense_id == expense_id), None)
+
     async def create(self, **expense_data: object) -> FakeExpense:
-        expense_id = f"expense-{len(self.expenses) + 1}"
-        expense = FakeExpense(id=expense_id, expense_id=expense_id, **expense_data)
+        expense_id = str(expense_data.get("expense_id", f"expense-{len(self.expenses) + 1}"))
+        fake_data = dict(expense_data)
+        fake_data.pop("expense_id", None)
+        expense = FakeExpense(id=expense_id, expense_id=expense_id, **fake_data)
         self.expenses[expense_id] = expense
         return expense
 
@@ -202,9 +224,17 @@ class FakeExpenseRepository:
         expense.updated_at = datetime.now(timezone.utc)
         return expense
 
+    async def delete(self, expense_id: str) -> FakeExpense:
+        expense = self.expenses[expense_id]
+        expense.is_active = False
+        return expense
+
     async def list(self, *, skip: int = 0, limit: int = 20, filters: dict[str, object] | None = None, sort_by: str = "created_at", sort_order: str = "desc", search: str | None = None) -> tuple[list[FakeExpense], int]:
         items = list(self.expenses.values())
         return items[skip : skip + limit], len(items)
+
+    async def list_history(self) -> list[FakeExpense]:
+        return list(self.expenses.values())
 
     async def list_by_vehicle(self, vehicle_id: str) -> list[FakeExpense]:
         return [item for item in self.expenses.values() if item.vehicle_id == vehicle_id]

@@ -62,38 +62,42 @@ class TripRepository:
         sort_order: str = "desc",
         search: str | None = None,
     ) -> tuple[list[Trip], int]:
-        items = await Trip.find(Trip.status != TripStatus.CANCELLED).to_list()
+        query = Trip.find(Trip.status != TripStatus.CANCELLED)
 
         if filters:
             status = filters.get("status")
             if status:
-                items = [item for item in items if item.status == status]
+                query = query.find(Trip.status == status)
 
             priority = filters.get("priority")
             if priority:
-                items = [item for item in items if item.priority == priority]
+                query = query.find(Trip.priority == priority)
 
             vehicle_id = filters.get("vehicle_id")
             if vehicle_id:
-                items = [item for item in items if str(item.vehicle_id) == str(vehicle_id)]
+                query = query.find(Trip.vehicle_id == _to_object_id(str(vehicle_id)))
 
             driver_id = filters.get("driver_id")
             if driver_id:
-                items = [item for item in items if str(item.driver_id) == str(driver_id)]
+                query = query.find(Trip.driver_id == _to_object_id(str(driver_id)))
 
         if search:
-            query = search.lower().strip()
-            items = [
-                item
-                for item in items
-                if query in item.trip_number.lower()
-                or query in item.source.lower()
-                or query in item.destination.lower()
-            ]
+            query_text = search.lower().strip()
+            query = query.find(
+                {
+                    "$or": [
+                        {"trip_number": {"$regex": query_text, "$options": "i"}},
+                        {"source": {"$regex": query_text, "$options": "i"}},
+                        {"destination": {"$regex": query_text, "$options": "i"}},
+                    ]
+                }
+            )
 
-        items.sort(key=lambda item: getattr(item, sort_by, item.created_at), reverse=sort_order == "desc")
-        total = len(items)
-        return items[skip : skip + limit], total
+        sort_direction = -1 if sort_order == "desc" else 1
+        sort_field = getattr(Trip, sort_by, Trip.created_at)
+        total = await query.count()
+        items = await query.sort((sort_field, sort_direction)).skip(skip).limit(limit).to_list()
+        return items, total
 
     async def list_active(self) -> list[Trip]:
         return await Trip.find(Trip.status == TripStatus.DISPATCHED).to_list()

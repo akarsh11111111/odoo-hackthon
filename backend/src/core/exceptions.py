@@ -10,6 +10,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from src.schemas.common import APIResponse, ErrorDetail
 
 logger = logging.getLogger(__name__)
+UNPROCESSABLE_STATUS = getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY)
 
 
 class TransitOpsException(Exception):
@@ -44,7 +45,7 @@ class ForbiddenException(TransitOpsException):
 
 class BusinessRuleException(TransitOpsException):
     def __init__(self, message: str = "Business rule violated") -> None:
-        super().__init__(message=message, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, code="business_rule")
+        super().__init__(message=message, status_code=UNPROCESSABLE_STATUS, code="business_rule")
 
 
 def _base_response(
@@ -79,7 +80,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             for error in exc.errors()
         ]
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=UNPROCESSABLE_STATUS,
             content=_base_response(success=False, message="Validation failed", errors=errors),
         )
 
@@ -92,7 +93,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
-        logger.exception("Unhandled application error", exc_info=exc)
+        logger.exception("Unhandled application error")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content=_base_response(success=False, message="Internal server error"),

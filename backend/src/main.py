@@ -11,6 +11,7 @@ from src.core.config import get_settings
 from src.core.database import close_mongo_connection, connect_to_mongo
 from src.core.exceptions import register_exception_handlers
 from src.core.logging import configure_logging
+from src.middleware.auth_context import AuthContextMiddleware
 from src.middleware.request_context import RequestContextMiddleware
 
 
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.add_middleware(AuthContextMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,

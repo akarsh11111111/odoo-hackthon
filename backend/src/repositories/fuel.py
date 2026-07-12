@@ -62,38 +62,42 @@ class FuelLogRepository:
         sort_order: str = "desc",
         search: str | None = None,
     ) -> tuple[list[FuelLog], int]:
-        items = await FuelLog.find(FuelLog.is_active == True).to_list()
+        query = FuelLog.find(FuelLog.is_active == True)
 
         if filters:
             vehicle_id = filters.get("vehicle_id")
             if vehicle_id:
-                items = [item for item in items if str(item.vehicle_id) == str(vehicle_id)]
+                query = query.find(FuelLog.vehicle_id == _to_object_id(str(vehicle_id)))
 
             trip_id = filters.get("trip_id")
             if trip_id:
-                items = [item for item in items if str(item.trip_id) == str(trip_id)]
+                query = query.find(FuelLog.trip_id == _to_object_id(str(trip_id)))
 
             driver_id = filters.get("driver_id")
             if driver_id:
-                items = [item for item in items if str(item.driver_id) == str(driver_id)]
+                query = query.find(FuelLog.driver_id == _to_object_id(str(driver_id)))
 
             fuel_type = filters.get("fuel_type")
             if fuel_type:
-                items = [item for item in items if item.fuel_type == fuel_type]
+                query = query.find(FuelLog.fuel_type == fuel_type)
 
         if search:
-            query = search.lower().strip()
-            items = [
-                item
-                for item in items
-                if query in item.fuel_log_id.lower()
-                or query in item.fuel_station.lower()
-                or query in item.notes.lower() if item.notes else False
-            ]
+            query_text = search.lower().strip()
+            query = query.find(
+                {
+                    "$or": [
+                        {"fuel_log_id": {"$regex": query_text, "$options": "i"}},
+                        {"fuel_station": {"$regex": query_text, "$options": "i"}},
+                        {"notes": {"$regex": query_text, "$options": "i"}},
+                    ]
+                }
+            )
 
-        items.sort(key=lambda item: getattr(item, sort_by, item.created_at), reverse=sort_order == "desc")
-        total = len(items)
-        return items[skip : skip + limit], total
+        sort_direction = -1 if sort_order == "desc" else 1
+        sort_field = getattr(FuelLog, sort_by, FuelLog.created_at)
+        total = await query.count()
+        items = await query.sort((sort_field, sort_direction)).skip(skip).limit(limit).to_list()
+        return items, total
 
     async def list_history(self) -> list[FuelLog]:
         return await FuelLog.find(FuelLog.is_active == True).to_list()

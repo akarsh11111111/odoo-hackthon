@@ -62,43 +62,47 @@ class MaintenanceRepository:
         sort_order: str = "desc",
         search: str | None = None,
     ) -> tuple[list[Maintenance], int]:
-        items = await Maintenance.find((Maintenance.is_active == True) & (Maintenance.status != MaintenanceStatus.REJECTED)).to_list()
+        query = Maintenance.find((Maintenance.is_active == True) & (Maintenance.status != MaintenanceStatus.REJECTED))
 
         if filters:
             vehicle_id = filters.get("vehicle_id")
             if vehicle_id:
-                items = [item for item in items if str(item.vehicle_id) == str(vehicle_id)]
+                query = query.find(Maintenance.vehicle_id == _to_object_id(str(vehicle_id)))
 
             status = filters.get("status")
             if status:
-                items = [item for item in items if item.status == status]
+                query = query.find(Maintenance.status == status)
 
             priority = filters.get("priority")
             if priority:
-                items = [item for item in items if item.priority == priority]
+                query = query.find(Maintenance.priority == priority)
 
             vendor_name = filters.get("vendor_name")
             if vendor_name:
-                items = [item for item in items if item.vendor_name == vendor_name]
+                query = query.find(Maintenance.vendor_name == vendor_name)
 
             scheduled_date = filters.get("scheduled_date")
             if scheduled_date:
-                items = [item for item in items if item.scheduled_date == scheduled_date]
+                query = query.find(Maintenance.scheduled_date == scheduled_date)
 
         if search:
-            query = search.lower().strip()
-            items = [
-                item
-                for item in items
-                if query in item.maintenance_id.lower()
-                or query in item.title.lower()
-                or query in item.description.lower()
-                or query in item.vendor_name.lower()
-            ]
+            query_text = search.lower().strip()
+            query = query.find(
+                {
+                    "$or": [
+                        {"maintenance_id": {"$regex": query_text, "$options": "i"}},
+                        {"title": {"$regex": query_text, "$options": "i"}},
+                        {"description": {"$regex": query_text, "$options": "i"}},
+                        {"vendor_name": {"$regex": query_text, "$options": "i"}},
+                    ]
+                }
+            )
 
-        items.sort(key=lambda item: getattr(item, sort_by, item.created_at), reverse=sort_order == "desc")
-        total = len(items)
-        return items[skip : skip + limit], total
+        sort_direction = -1 if sort_order == "desc" else 1
+        sort_field = getattr(Maintenance, sort_by, Maintenance.created_at)
+        total = await query.count()
+        items = await query.sort((sort_field, sort_direction)).skip(skip).limit(limit).to_list()
+        return items, total
 
     async def list_active(self) -> list[Maintenance]:
         return await Maintenance.find(

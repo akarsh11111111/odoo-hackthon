@@ -62,35 +62,39 @@ class VehicleRepository:
         sort_order: str = "desc",
         search: str | None = None,
     ) -> tuple[list[Vehicle], int]:
-        items = await Vehicle.find(Vehicle.is_active == True).to_list()
+        query = Vehicle.find(Vehicle.is_active == True)
 
         if filters:
             region = filters.get("region")
             if region:
-                items = [item for item in items if item.region == region]
+                query = query.find(Vehicle.region == region)
 
             status = filters.get("status")
             if status:
-                items = [item for item in items if item.status == status]
+                query = query.find(Vehicle.status == status)
 
             vehicle_type = filters.get("vehicle_type")
             if vehicle_type:
-                items = [item for item in items if item.vehicle_type == vehicle_type]
+                query = query.find(Vehicle.vehicle_type == vehicle_type)
 
         if search:
-            query = search.lower().strip()
-            items = [
-                item
-                for item in items
-                if query in item.registration_number.lower()
-                or query in item.vehicle_name.lower()
-                or query in item.vehicle_model.lower()
-                or query in item.region.lower()
-            ]
+            query_text = search.lower().strip()
+            query = query.find(
+                {
+                    "$or": [
+                        {"registration_number": {"$regex": query_text, "$options": "i"}},
+                        {"vehicle_name": {"$regex": query_text, "$options": "i"}},
+                        {"vehicle_model": {"$regex": query_text, "$options": "i"}},
+                        {"region": {"$regex": query_text, "$options": "i"}},
+                    ]
+                }
+            )
 
-        items.sort(key=lambda item: getattr(item, sort_by, item.created_at), reverse=sort_order == "desc")
-        total = len(items)
-        return items[skip : skip + limit], total
+        sort_direction = -1 if sort_order == "desc" else 1
+        sort_field = getattr(Vehicle, sort_by, Vehicle.created_at)
+        total = await query.count()
+        items = await query.sort((sort_field, sort_direction)).skip(skip).limit(limit).to_list()
+        return items, total
 
     async def list_available(self) -> list[Vehicle]:
         return await Vehicle.find(

@@ -62,31 +62,35 @@ class DriverRepository:
         sort_order: str = "desc",
         search: str | None = None,
     ) -> tuple[list[Driver], int]:
-        items = await Driver.find(Driver.is_active == True).to_list()
+        query = Driver.find(Driver.is_active == True)
 
         if filters:
             region = filters.get("region")
             if region:
-                items = [item for item in items if item.region == region]
+                query = query.find(Driver.region == region)
 
             status = filters.get("status")
             if status:
-                items = [item for item in items if item.driver_status == status]
+                query = query.find(Driver.driver_status == status)
 
         if search:
-            query = search.lower().strip()
-            items = [
-                item
-                for item in items
-                if query in item.first_name.lower()
-                or query in item.last_name.lower()
-                or query in item.region.lower()
-                or query in item.license_number.lower()
-            ]
+            query_text = search.lower().strip()
+            query = query.find(
+                {
+                    "$or": [
+                        {"first_name": {"$regex": query_text, "$options": "i"}},
+                        {"last_name": {"$regex": query_text, "$options": "i"}},
+                        {"region": {"$regex": query_text, "$options": "i"}},
+                        {"license_number": {"$regex": query_text, "$options": "i"}},
+                    ]
+                }
+            )
 
-        items.sort(key=lambda item: getattr(item, sort_by, item.created_at), reverse=sort_order == "desc")
-        total = len(items)
-        return items[skip : skip + limit], total
+        sort_direction = -1 if sort_order == "desc" else 1
+        sort_field = getattr(Driver, sort_by, Driver.created_at)
+        total = await query.count()
+        items = await query.sort((sort_field, sort_direction)).skip(skip).limit(limit).to_list()
+        return items, total
 
     async def list_available(self) -> list[Driver]:
         return await Driver.find((Driver.is_active == True) & (Driver.driver_status == "Available")).to_list()

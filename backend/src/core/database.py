@@ -5,9 +5,13 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from beanie import init_beanie
 
 from src.core.config import get_settings
+from src.models.audit import AuditLog
 from src.models.auth import RefreshToken, Role, User
 from src.models.driver import Driver, DriverActivityLog
+from src.models.expense import Expense, ExpenseActivityLog
+from src.models.fuel import FuelLog, FuelLogActivityLog
 from src.models.maintenance import Maintenance, MaintenanceLog
+from src.models.notification import Notification
 from src.models.trip import Trip, TripActivityLog as TripAuditLog
 from src.models.vehicle import Vehicle, VehicleActivityLog
 from src.repositories.auth import RoleRepository
@@ -30,7 +34,7 @@ async def connect_to_mongo() -> AsyncIOMotorDatabase | None:
     mongo_database = mongo_client[settings.mongo_db]
     await init_beanie(
         database=mongo_database,
-        document_models=[Role, User, RefreshToken, Vehicle, VehicleActivityLog, Driver, DriverActivityLog, Trip, TripAuditLog, Maintenance, MaintenanceLog],
+        document_models=[Role, User, RefreshToken, Vehicle, VehicleActivityLog, Driver, DriverActivityLog, Trip, TripAuditLog, Maintenance, MaintenanceLog, FuelLog, FuelLogActivityLog, Expense, ExpenseActivityLog, AuditLog, Notification],
     )
     await RoleRepository().ensure_default_roles()
     return mongo_database

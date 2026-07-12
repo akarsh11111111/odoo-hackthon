@@ -62,39 +62,43 @@ class ExpenseRepository:
         sort_order: str = "desc",
         search: str | None = None,
     ) -> tuple[list[Expense], int]:
-        items = await Expense.find(Expense.is_active == True).to_list()
+        query = Expense.find(Expense.is_active == True)
 
         if filters:
             vehicle_id = filters.get("vehicle_id")
             if vehicle_id:
-                items = [item for item in items if str(item.vehicle_id) == str(vehicle_id)]
+                query = query.find(Expense.vehicle_id == _to_object_id(str(vehicle_id)))
 
             trip_id = filters.get("trip_id")
             if trip_id:
-                items = [item for item in items if str(item.trip_id) == str(trip_id)]
+                query = query.find(Expense.trip_id == _to_object_id(str(trip_id)))
 
             expense_type = filters.get("expense_type")
             if expense_type:
-                items = [item for item in items if item.expense_type == expense_type]
+                query = query.find(Expense.expense_type == expense_type)
 
             vendor = filters.get("vendor")
             if vendor:
-                items = [item for item in items if item.vendor == vendor]
+                query = query.find(Expense.vendor == vendor)
 
         if search:
-            query = search.lower().strip()
-            items = [
-                item
-                for item in items
-                if query in item.expense_id.lower()
-                or query in item.vendor.lower()
-                or query in item.invoice_number.lower()
-                or query in item.description.lower()
-            ]
+            query_text = search.lower().strip()
+            query = query.find(
+                {
+                    "$or": [
+                        {"expense_id": {"$regex": query_text, "$options": "i"}},
+                        {"vendor": {"$regex": query_text, "$options": "i"}},
+                        {"invoice_number": {"$regex": query_text, "$options": "i"}},
+                        {"description": {"$regex": query_text, "$options": "i"}},
+                    ]
+                }
+            )
 
-        items.sort(key=lambda item: getattr(item, sort_by, item.created_at), reverse=sort_order == "desc")
-        total = len(items)
-        return items[skip : skip + limit], total
+        sort_direction = -1 if sort_order == "desc" else 1
+        sort_field = getattr(Expense, sort_by, Expense.created_at)
+        total = await query.count()
+        items = await query.sort((sort_field, sort_direction)).skip(skip).limit(limit).to_list()
+        return items, total
 
     async def list_history(self) -> list[Expense]:
         return await Expense.find(Expense.is_active == True).to_list()
