@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from beanie import Document, Indexed
 from pydantic import Field
+from pymongo import ASCENDING, DESCENDING, IndexModel
 
 
 def utcnow() -> datetime:
@@ -33,3 +34,7 @@ class AuditLog(Document):
 
     class Settings:
         name = "audit_logs"
+        indexes = [
+            IndexModel([("entity_type", ASCENDING), ("entity_id", ASCENDING), ("timestamp", DESCENDING)], name="audit_entity_timestamp_idx"),
+            IndexModel([("performed_by", ASCENDING), ("timestamp", DESCENDING)], name="audit_actor_timestamp_idx"),
+        ]

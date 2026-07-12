@@ -8,6 +8,7 @@ from enum import Enum
 from beanie import Document, Indexed
 from beanie.odm.fields import PydanticObjectId
 from pydantic import Field
+from pymongo import ASCENDING, IndexModel
 
 
 def utcnow() -> datetime:
@@ -61,6 +62,10 @@ class Vehicle(Document):
 
     class Settings:
         name = "vehicles"
+        indexes = [
+            IndexModel([("is_active", ASCENDING), ("status", ASCENDING)], name="vehicle_active_status_idx"),
+            IndexModel([("region", ASCENDING), ("status", ASCENDING)], name="vehicle_region_status_idx"),
+        ]
 
 
 class VehicleActivityLog(Document):

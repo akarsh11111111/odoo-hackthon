@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from beanie import Document, Indexed
 from pydantic import Field
+from pymongo import ASCENDING, DESCENDING, IndexModel
 
 
 def utcnow() -> datetime:
@@ -53,3 +54,7 @@ class Notification(Document):
 
     class Settings:
         name = "notifications"
+        indexes = [
+            IndexModel([("recipient_user_id", ASCENDING), ("is_read", ASCENDING)], name="notification_recipient_read_idx"),
+            IndexModel([("recipient_user_id", ASCENDING), ("created_at", DESCENDING)], name="notification_recipient_created_idx"),
+        ]

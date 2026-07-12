@@ -9,13 +9,19 @@ from datetime import datetime, timezone
 from src.core.config import get_settings
 
 request_id_context: ContextVar[str] = ContextVar("request_id", default="-")
+user_context: ContextVar[str] = ContextVar("user_id", default="-")
+role_context: ContextVar[str] = ContextVar("role_name", default="-")
+token_context: ContextVar[str] = ContextVar("token_type", default="-")
 
 
 class RequestIdFilter(logging.Filter):
-    """Attach the active request id to each log record."""
+    """Attach correlation context to each log record."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = request_id_context.get()
+        record.user_id = user_context.get()
+        record.role_name = role_context.get()
+        record.token_type = token_context.get()
         return True
 
 
@@ -29,6 +35,9 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
             "request_id": getattr(record, "request_id", "-"),
+            "user_id": getattr(record, "user_id", "-"),
+            "role_name": getattr(record, "role_name", "-"),
+            "token_type": getattr(record, "token_type", "-"),
         }
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)

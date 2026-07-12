@@ -8,6 +8,7 @@ from enum import Enum
 from beanie import Document, Indexed
 from beanie.odm.fields import PydanticObjectId
 from pydantic import Field
+from pymongo import ASCENDING, IndexModel
 
 
 def utcnow() -> datetime:
@@ -49,6 +50,10 @@ class Driver(Document):
 
     class Settings:
         name = "drivers"
+        indexes = [
+            IndexModel([("is_active", ASCENDING), ("driver_status", ASCENDING)], name="driver_active_status_idx"),
+            IndexModel([("region", ASCENDING), ("driver_status", ASCENDING)], name="driver_region_status_idx"),
+        ]
 
 
 class DriverActivityLog(Document):
